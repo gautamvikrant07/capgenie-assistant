@@ -1,3 +1,4 @@
+
 import { Bot, Users, LineChart, ShieldCheck, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
