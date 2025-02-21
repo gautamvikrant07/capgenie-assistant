@@ -1,18 +1,54 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Home } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement login logic
-    console.log("Login attempt:", { email, password });
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*, user_roles(*)')
+          .eq('id', data.user.id)
+          .single();
+
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to log in",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -22,6 +58,13 @@ const Login = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
+        {/* Home Button */}
+        <div className="absolute top-4 left-4">
+          <Link to="/" className="btn-ghost p-2 rounded-full hover:bg-muted">
+            <Home className="w-6 h-6" />
+          </Link>
+        </div>
+
         {/* Logo & Title */}
         <div className="text-center mb-8">
           <h1 className="heading-lg text-primary mb-2">CapGenie</h1>
@@ -81,8 +124,8 @@ const Login = () => {
           </div>
 
           {/* Submit Button */}
-          <button type="submit" className="btn-primary w-full">
-            Login
+          <button type="submit" className="btn-primary w-full" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
           </button>
 
           {/* Sign Up Link */}

@@ -1,4 +1,3 @@
-
 import { Bot, Users, LineChart, ShieldCheck, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -44,9 +43,6 @@ const Index = () => {
               <button className="btn-primary" onClick={handleGetStarted}>
                 Get Started
                 <ArrowRight className="ml-2 w-5 h-5 inline" />
-              </button>
-              <button className="btn-secondary">
-                Schedule Demo
               </button>
             </div>
           </motion.div>
