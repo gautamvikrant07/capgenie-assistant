@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Eye, EyeOff, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import type { Profile } from "@/types/supabase";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);

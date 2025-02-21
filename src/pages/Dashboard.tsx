@@ -5,10 +5,11 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ArrowUpRight, Users, Database, FileCheck } from "lucide-react";
+import type { Profile } from "@/types/supabase";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const chartData = [
@@ -41,7 +42,9 @@ const Dashboard = () => {
           .eq('id', user.id)
           .single();
         
-        setProfile(profile);
+        if (profile) {
+          setProfile(profile);
+        }
       }
     } catch (error) {
       console.error('Error loading user data:', error);
