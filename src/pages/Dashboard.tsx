@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -8,13 +7,17 @@ import {
   Bell, 
   User, 
   ChevronDown, 
+  ChevronRight,
   LineChart, 
   Database, 
   FileCode, 
   BarChart, 
   Settings,
   Menu,
-  X
+  X,
+  Play,
+  CheckSquare,
+  TrendingUp
 } from "lucide-react";
 
 const QuickAccessWidget = ({ title, description, icon: Icon, onClick }: { 
@@ -55,16 +58,64 @@ const RecentActivity = ({ type, description, time }: {
   </div>
 );
 
+const SubMenuItem = ({ icon: Icon, label, description, path }: {
+  icon: any;
+  label: string;
+  description: string;
+  path: string;
+}) => (
+  <Link
+    to={path}
+    className="block p-3 hover:bg-muted rounded-lg transition-colors"
+  >
+    <div className="flex items-start gap-3">
+      <div className="p-2 bg-primary/10 rounded-lg">
+        <Icon size={16} className="text-primary" />
+      </div>
+      <div>
+        <h4 className="font-medium text-sm">{label}</h4>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  </Link>
+);
+
 const Dashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [userRole] = useState("analyst"); // This would come from auth context
+  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+  const [userRole] = useState("analyst");
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   const sidebarLinks = [
     { icon: LineChart, label: "Dashboard", path: "/dashboard" },
     { icon: Bot, label: "AI Chatbot", path: "/chatbot" },
-    { icon: Database, label: "Database Interaction", path: "/database", roles: ["sme"] },
+    {
+      icon: Database,
+      label: "Database Interaction",
+      path: "/database",
+      roles: ["sme", "analyst"],
+      subItems: [
+        {
+          icon: Play,
+          label: "Run Query",
+          path: "/database/query",
+          description: "Execute natural language queries on your data"
+        },
+        {
+          icon: CheckSquare,
+          label: "Data Validation",
+          path: "/database/validation",
+          description: "Validate regulatory data against defined rules"
+        },
+        {
+          icon: TrendingUp,
+          label: "Impact Analysis",
+          path: "/database/analysis",
+          description: "Analyze potential impacts of data changes"
+        }
+      ]
+    },
     { icon: FileCode, label: "Beyond Compare", path: "/compare" },
     { icon: BarChart, label: "Visualization", path: "/visualization" },
     { icon: Settings, label: "Settings", path: "/settings" },
@@ -72,7 +123,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top Navigation */}
       <nav className="h-[60px] border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 fixed top-0 w-full z-50">
         <div className="flex items-center justify-between h-full px-4">
           <div className="flex items-center gap-4">
@@ -83,7 +133,6 @@ const Dashboard = () => {
           </div>
           
           <div className="flex items-center gap-6">
-            {/* Search */}
             <div className="hidden md:flex items-center gap-2 bg-muted px-3 py-1.5 rounded-lg">
               <Search size={18} className="text-muted-foreground" />
               <input 
@@ -93,13 +142,11 @@ const Dashboard = () => {
               />
             </div>
             
-            {/* Notifications */}
             <button className="p-2 hover:bg-muted rounded-lg relative">
               <Bell size={20} />
               <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full"></span>
             </button>
             
-            {/* User Menu */}
             <button className="flex items-center gap-2 p-2 hover:bg-muted rounded-lg">
               <User size={20} />
               <ChevronDown size={16} />
@@ -108,38 +155,67 @@ const Dashboard = () => {
         </div>
       </nav>
 
-      {/* Sidebar */}
       <aside className={`fixed left-0 top-[60px] h-[calc(100vh-60px)] bg-background border-r transition-all duration-300 ${
         isSidebarOpen ? 'w-[250px]' : 'w-0 -translate-x-full'
       }`}>
-        <div className="p-4 space-y-2">
+        <div className="p-4 space-y-1">
           {sidebarLinks.map((link, index) => (
             link.roles === undefined || link.roles.includes(userRole) ? (
-              <Link
-                key={index}
-                to={link.path}
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <link.icon size={20} />
-                <span>{link.label}</span>
-              </Link>
+              <div key={index}>
+                {link.subItems ? (
+                  <div>
+                    <button
+                      onClick={() => setExpandedMenu(expandedMenu === link.label ? null : link.label)}
+                      className="w-full flex items-center justify-between px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <link.icon size={20} />
+                        <span>{link.label}</span>
+                      </div>
+                      <ChevronRight
+                        size={16}
+                        className={`transition-transform ${
+                          expandedMenu === link.label ? 'rotate-90' : ''
+                        }`}
+                      />
+                    </button>
+                    {expandedMenu === link.label && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="ml-4 mt-1 space-y-1"
+                      >
+                        {link.subItems.map((subItem, subIndex) => (
+                          <SubMenuItem key={subIndex} {...subItem} />
+                        ))}
+                      </motion.div>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    to={link.path}
+                    className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <link.icon size={20} />
+                    <span>{link.label}</span>
+                  </Link>
+                )}
+              </div>
             ) : null
           ))}
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className={`pt-[60px] min-h-[calc(100vh-60px)] transition-all duration-300 ${
         isSidebarOpen ? 'ml-[250px]' : 'ml-0'
       }`}>
         <div className="container py-8">
-          {/* Welcome Section */}
           <div className="mb-8">
             <h1 className="heading-lg mb-2">Welcome back, User!</h1>
             <p className="text-muted-foreground">Here's what's happening with your reports.</p>
           </div>
 
-          {/* Quick Access Widgets */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <QuickAccessWidget
               title="Run Query"
@@ -161,7 +237,6 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* Recent Activity */}
           <div className="glass-card rounded-xl p-6">
             <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
             <div className="space-y-2">

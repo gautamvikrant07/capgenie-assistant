@@ -8,7 +8,7 @@ import Index from "./pages/Index";
 import Login from "./pages/auth/Login";
 import SignUp from "./pages/auth/SignUp";
 import Dashboard from "./pages/Dashboard";
-import DatabaseInteraction from "./pages/database/DatabaseInteraction";
+import RunQuery from "./pages/database/query/RunQuery";
 import BeyondCompare from "./pages/compare/BeyondCompare";
 import NotFound from "./pages/NotFound";
 
@@ -25,7 +25,9 @@ const App = () => (
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<SignUp />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/database" element={<DatabaseInteraction />} />
+          <Route path="/database/query" element={<RunQuery />} />
+          <Route path="/database/validation" element={<RunQuery />} />
+          <Route path="/database/analysis" element={<RunQuery />} />
           <Route path="/compare" element={<BeyondCompare />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
