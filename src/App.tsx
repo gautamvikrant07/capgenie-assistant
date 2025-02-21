@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import Login from "./pages/auth/Login";
 import SignUp from "./pages/auth/SignUp";
 import Dashboard from "./pages/Dashboard";
+import DatabaseInteraction from "./pages/database/DatabaseInteraction";
+import BeyondCompare from "./pages/compare/BeyondCompare";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +25,8 @@ const App = () => (
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<SignUp />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/database" element={<DatabaseInteraction />} />
+          <Route path="/compare" element={<BeyondCompare />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
