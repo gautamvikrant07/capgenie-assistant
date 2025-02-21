@@ -1,6 +1,6 @@
-
 import { Bot, Users, LineChart, ShieldCheck, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 const FeatureCard = ({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
   <motion.div
@@ -16,6 +16,12 @@ const FeatureCard = ({ icon: Icon, title, description }: { icon: any, title: str
 );
 
 const Index = () => {
+  const navigate = useNavigate();
+
+  const handleGetStarted = () => {
+    navigate("/auth/login");
+  };
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -34,7 +40,7 @@ const Index = () => {
               powered by advanced AI and automation.
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
-              <button className="btn-primary">
+              <button className="btn-primary" onClick={handleGetStarted}>
                 Get Started
                 <ArrowRight className="ml-2 w-5 h-5 inline" />
               </button>
@@ -166,6 +172,7 @@ const Index = () => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="btn-primary"
+            onClick={handleGetStarted}
           >
             Get Started Now
             <ArrowRight className="ml-2 w-5 h-5 inline" />
