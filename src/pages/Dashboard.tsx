@@ -5,12 +5,16 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ArrowUpRight, Users, Database, FileCheck } from "lucide-react";
-import type { ProfileWithRoles } from "@/types/supabase";
+import type { Profile, UserRole } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
+
+type ProfileResponse = Profile & {
+  user_roles: UserRole[] | null;
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [profileData, setProfileData] = useState<ProfileWithRoles | null>(null);
+  const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -51,10 +55,10 @@ const Dashboard = () => {
         .from('profiles')
         .select(`
           *,
-          user_roles (*)
+          user_roles(*)
         `)
         .eq('id', user.id)
-        .maybeSingle();
+        .single();
 
       if (error) {
         console.error('Error fetching profile:', error);
@@ -67,7 +71,7 @@ const Dashboard = () => {
       }
 
       if (data) {
-        setProfileData(data as ProfileWithRoles);
+        setProfileData(data as ProfileResponse);
       }
     } catch (error) {
       console.error('Error loading user data:', error);
