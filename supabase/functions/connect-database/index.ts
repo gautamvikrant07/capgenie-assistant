@@ -18,16 +18,14 @@ serve(async (req) => {
     
     let db;
     if (fileContent) {
-      // Convert fileContent to Uint8Array
+      // Create in-memory database
+      db = new DB(':memory:');
+      
+      // Import the database content
       const uint8Array = new Uint8Array(Object.values(fileContent));
+      db.execute('RESTORE FROM ?', [uint8Array]);
       
-      // Create a temporary file
-      const tempFile = await Deno.makeTempFile({ suffix: '.db' });
-      await Deno.writeFile(tempFile, uint8Array);
-      console.log('Created temp file:', tempFile);
-      
-      // Open the database
-      db = new DB(tempFile);
+      console.log('Loaded database into memory');
     } else if (dbPath) {
       db = new DB(dbPath);
     } else {
