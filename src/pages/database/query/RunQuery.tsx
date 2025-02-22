@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Database, Play, Download, Save, Terminal, CheckCircle, Loader2, FileText } from "lucide-react";
@@ -6,6 +7,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 type QueryResult = Record<string, any>;
+
+// Define the database function parameters and return type
+type ExecuteQueryFunctionParams = {
+  query_string: string;
+};
+
+type ExecuteQueryFunctionReturn = QueryResult[];
 
 const RunQuery = () => {
   const [query, setQuery] = useState("");
@@ -75,15 +83,17 @@ const RunQuery = () => {
     setLoading(true);
     try {
       const { data: queryData, error: queryError } = await supabase
-        .rpc('execute_query', {
-          query_string: generatedSQL
-        });
+        .rpc<ExecuteQueryFunctionReturn, ExecuteQueryFunctionParams>(
+          'execute_query',
+          { query_string: generatedSQL }
+        );
 
       if (queryError) throw queryError;
 
-      const queryResults = (queryData || []) as QueryResult[];
+      const queryResults = queryData || [];
       setResults(queryResults);
 
+      // Get AI analysis of the results
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-results', {
         body: { 
           query,

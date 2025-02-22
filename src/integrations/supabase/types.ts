@@ -228,7 +228,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      execute_query: {
+        Args: {
+          query_string: string
+        }
+        Returns: Json[]
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
