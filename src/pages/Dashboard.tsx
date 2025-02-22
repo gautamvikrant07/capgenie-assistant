@@ -10,6 +10,7 @@ import type { Profile, UserRole } from "@/types/supabase";
 const Dashboard = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
 
   const chartData = [
@@ -36,39 +37,32 @@ const Dashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        const { data, error } = await supabase
+        // Fetch profile data
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select(`
-            id,
-            first_name,
-            last_name,
-            created_at,
-            updated_at,
-            user_roles (
-              id,
-              role,
-              created_at
-            )
-          `)
+          .select('*')
           .eq('id', user.id)
           .single();
 
-        if (error) {
-          console.error('Error fetching profile:', error);
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
           return;
         }
-        
-        if (data) {
-          // Ensure the data matches the Profile type
-          const profileData: Profile = {
-            id: data.id,
-            first_name: data.first_name,
-            last_name: data.last_name,
-            created_at: data.created_at,
-            updated_at: data.updated_at,
-            user_roles: data.user_roles as UserRole[]
-          };
+
+        if (profileData) {
           setProfile(profileData);
+          
+          // Fetch user roles separately
+          const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('*')
+            .eq('user_id', user.id);
+
+          if (roleError) {
+            console.error('Error fetching user roles:', roleError);
+          } else if (roleData) {
+            setUserRoles(roleData);
+          }
         }
       }
     } catch (error) {

@@ -5,7 +5,6 @@ export type Profile = {
   last_name: string | null;
   created_at: string;
   updated_at: string;
-  user_roles?: UserRole[];
 };
 
 export type UserRole = {
