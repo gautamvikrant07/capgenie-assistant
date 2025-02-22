@@ -1,22 +1,53 @@
 
 import { useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Command } from "cmdk";
 import { 
-  Bot, Search, Bell, User, ChevronDown, ChevronRight,
-  LineChart, Database, FileCode, BarChart, Settings,
-  Menu, X, Play, CheckSquare, TrendingUp
+  Search, Bell, User, ChevronDown, ChevronRight,
+  LineChart, Database, FileCode, Menu, X, Play, 
+  CheckSquare, TrendingUp, LogOut, Settings, UserCircle
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [expandedMenu, setExpandedMenu] = useState<string | null>("Database Interaction");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [userRole] = useState("analyst");
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out successfully",
+        description: "You have been logged out of your account.",
+      });
+      navigate("/auth/login");
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+      });
+    }
+  };
 
   const sidebarLinks = [
     { icon: LineChart, label: "Dashboard", path: "/dashboard" },
-    { icon: Bot, label: "AI Chatbot", path: "/chatbot" },
     {
       icon: Database,
       label: "Database Interaction",
@@ -43,9 +74,15 @@ const DashboardLayout = () => {
         }
       ]
     },
-    { icon: FileCode, label: "Beyond Compare", path: "/compare" },
-    { icon: BarChart, label: "Visualization", path: "/visualization" },
     { icon: Settings, label: "Settings", path: "/settings" },
+  ];
+
+  const searchItems = [
+    { title: "Dashboard", path: "/dashboard" },
+    { title: "Run Query", path: "/database/query" },
+    { title: "Data Validation", path: "/database/validation" },
+    { title: "Impact Analysis", path: "/database/analysis" },
+    { title: "Settings", path: "/settings" },
   ];
 
   return (
@@ -60,24 +97,47 @@ const DashboardLayout = () => {
           </div>
           
           <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center gap-2 bg-muted px-3 py-1.5 rounded-lg">
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="hidden md:flex items-center gap-2 bg-muted px-3 py-1.5 rounded-lg"
+            >
               <Search size={18} className="text-muted-foreground" />
-              <input 
-                type="text" 
-                placeholder="Search..." 
-                className="bg-transparent border-none outline-none w-48"
-              />
-            </div>
+              <span className="text-muted-foreground">Search...</span>
+              <kbd className="ml-3 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </button>
             
             <button className="p-2 hover:bg-muted rounded-lg relative">
               <Bell size={20} />
               <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full"></span>
             </button>
             
-            <button className="flex items-center gap-2 p-2 hover:bg-muted rounded-lg">
-              <User size={20} />
-              <ChevronDown size={16} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 p-2 hover:bg-muted rounded-lg">
+                  <User size={20} />
+                  <ChevronDown size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/profile")}>
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/settings")}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </nav>
@@ -151,6 +211,48 @@ const DashboardLayout = () => {
           ))}
         </div>
       </aside>
+
+      {isSearchOpen && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
+          <div className="fixed left-1/2 top-1/4 w-full max-w-xl -translate-x-1/2 rounded-xl border bg-background shadow-lg">
+            <Command className="rounded-lg border shadow-md">
+              <div className="flex items-center border-b px-3">
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Type a command or search..."
+                  className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <button
+                  onClick={() => setIsSearchOpen(false)}
+                  className="ml-2 p-1 hover:bg-muted rounded"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto p-2">
+                {searchItems
+                  .filter(item => 
+                    item.title.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => {
+                        navigate(item.path);
+                        setIsSearchOpen(false);
+                      }}
+                      className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted"
+                    >
+                      {item.title}
+                    </button>
+                  ))}
+              </div>
+            </Command>
+          </div>
+        </div>
+      )}
 
       <main className={`pt-[60px] min-h-[calc(100vh-60px)] transition-all duration-300 ${
         isSidebarOpen ? 'ml-[250px]' : 'ml-0'

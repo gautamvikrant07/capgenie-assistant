@@ -1,32 +1,123 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle } from "lucide-react";
+import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const RunQuery = () => {
   const [query, setQuery] = useState("");
+  const [dbName, setDbName] = useState("");
   const [generatedSQL, setGeneratedSQL] = useState("");
   const [results, setResults] = useState<any[]>([]);
-  const [chartData] = useState([
-    { name: 'Jan', value: 12.5 },
-    { name: 'Feb', value: 13.2 },
-    { name: 'Mar', value: 12.8 },
-    { name: 'Apr', value: 13.5 },
-    { name: 'May', value: 13.8 },
-    { name: 'Jun', value: 14.2 },
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbTables, setDbTables] = useState<string[]>([]);
+  const { toast } = useToast();
 
-  const handleGenerateSQL = () => {
-    setGeneratedSQL("SELECT * FROM regulatory_data WHERE reporting_date > '2024-01-01'");
+  const loadDatabase = async () => {
+    if (!dbName) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter a database name",
+      });
+      return;
+    }
+
+    setDbLoading(true);
+    try {
+      // Call the Supabase Edge Function to connect to the database
+      const { data, error } = await supabase.functions.invoke('connect-database', {
+        body: { dbName }
+      });
+
+      if (error) throw error;
+
+      setDbTables(data.tables);
+      toast({
+        title: "Success",
+        description: "Database loaded successfully",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to load database",
+      });
+    } finally {
+      setDbLoading(false);
+    }
   };
 
-  const handleRunQuery = () => {
-    setResults([
-      { id: 1, metric: "Capital Ratio", value: "12.5%", date: "2024-01-15", trend: "up" },
-      { id: 2, metric: "Liquidity Coverage", value: "110%", date: "2024-01-15", trend: "down" },
-      { id: 3, metric: "Net Stable Funding", value: "105%", date: "2024-01-15", trend: "up" },
-    ]);
+  const handleGenerateSQL = async () => {
+    if (!query) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter a query",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Call the Supabase Edge Function to generate SQL
+      const { data, error } = await supabase.functions.invoke('generate-sql', {
+        body: { 
+          query,
+          dbName,
+          tables: dbTables
+        }
+      });
+
+      if (error) throw error;
+
+      setGeneratedSQL(data.sql);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to generate SQL",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRunQuery = async () => {
+    if (!generatedSQL) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please generate SQL first",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Call the Supabase Edge Function to execute the query
+      const { data, error } = await supabase.functions.invoke('execute-query', {
+        body: { 
+          sql: generatedSQL,
+          dbName
+        }
+      });
+
+      if (error) throw error;
+
+      setResults(data.results);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to execute query",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -43,7 +134,43 @@ const RunQuery = () => {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <div className="glass-card rounded-xl p-6 mb-6 bg-gradient-to-br from-primary/5 to-accent/5">
+          <div className="glass-card rounded-xl p-6 mb-6">
+            <div className="flex gap-4 mb-6">
+              <input
+                type="text"
+                value={dbName}
+                onChange={(e) => setDbName(e.target.value)}
+                placeholder="Enter database name..."
+                className="flex-1 px-4 py-2 rounded-lg border border-input bg-background 
+                         focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <button
+                onClick={loadDatabase}
+                disabled={dbLoading}
+                className="btn-primary flex items-center gap-2"
+              >
+                {dbLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Database className="w-4 h-4" />
+                )}
+                Load Database
+              </button>
+            </div>
+
+            {dbTables.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium mb-2">Available Tables</h3>
+                <div className="flex flex-wrap gap-2">
+                  {dbTables.map((table) => (
+                    <span key={table} className="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full">
+                      {table}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <label className="block text-sm font-medium mb-2">Query Input</label>
             <textarea
               value={query}
@@ -114,27 +241,19 @@ const RunQuery = () => {
                 <table className="w-full">
                   <thead className="bg-muted/50">
                     <tr>
-                      <th className="text-left p-3 font-medium">Metric</th>
-                      <th className="text-left p-3 font-medium">Value</th>
-                      <th className="text-left p-3 font-medium">Date</th>
-                      <th className="text-left p-3 font-medium">Trend</th>
+                      {Object.keys(results[0]).map((key) => (
+                        <th key={key} className="text-left p-3 font-medium">{key}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {results.map((row) => (
-                      <tr key={row.id} className="border-b last:border-0 hover:bg-muted/50">
-                        <td className="p-3">{row.metric}</td>
-                        <td className="p-3 font-medium">{row.value}</td>
-                        <td className="p-3 text-muted-foreground">{row.date}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            row.trend === 'up' 
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}>
-                            {row.trend === 'up' ? '↑ Up' : '↓ Down'}
-                          </span>
-                        </td>
+                    {results.map((row, i) => (
+                      <tr key={i} className="border-b last:border-0 hover:bg-muted/50">
+                        {Object.values(row).map((value: any, j) => (
+                          <td key={j} className="p-3">
+                            {typeof value === 'object' ? JSON.stringify(value) : value}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
@@ -149,7 +268,7 @@ const RunQuery = () => {
             <h2 className="text-lg font-semibold mb-4">Trend Analysis</h2>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
+                <LineChart data={results}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
