@@ -8,13 +8,13 @@ import { ArrowUpRight, Users, Database, FileCheck } from "lucide-react";
 import type { Profile, UserRole } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
 
-type ProfileResponse = Profile & {
-  user_roles: UserRole[] | null;
-};
+interface DashboardProfile extends Profile {
+  user_roles: UserRole[];
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
+  const [profileData, setProfileData] = useState<DashboardProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -51,17 +51,15 @@ const Dashboard = () => {
         return;
       }
 
-      const { data, error } = await supabase
+      // First fetch the profile
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles(*)
-        `)
+        .select('*')
         .eq('id', user.id)
         .single();
 
-      if (error) {
-        console.error('Error fetching profile:', error);
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
         toast({
           variant: "destructive",
           title: "Error",
@@ -70,8 +68,27 @@ const Dashboard = () => {
         return;
       }
 
-      if (data) {
-        setProfileData(data as ProfileResponse);
+      // Then fetch the roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (rolesError) {
+        console.error('Error fetching roles:', rolesError);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load user roles."
+        });
+        return;
+      }
+
+      if (profile) {
+        setProfileData({
+          ...profile,
+          user_roles: roles || []
+        });
       }
     } catch (error) {
       console.error('Error loading user data:', error);
