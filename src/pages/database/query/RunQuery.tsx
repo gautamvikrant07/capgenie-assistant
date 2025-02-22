@@ -7,10 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 
 type QueryResult = Record<string, any>;
 
-interface ExecuteQueryParams {
-  query_string: string;
-}
-
 const RunQuery = () => {
   const [query, setQuery] = useState("");
   const [generatedSQL, setGeneratedSQL] = useState("");
@@ -79,13 +75,13 @@ const RunQuery = () => {
     setLoading(true);
     try {
       const { data: queryData, error: queryError } = await supabase
-        .rpc<QueryResult[]>('execute_query', {
+        .rpc('execute_query', {
           query_string: generatedSQL
-        } satisfies ExecuteQueryParams);
+        });
 
       if (queryError) throw queryError;
 
-      const queryResults = queryData || [];
+      const queryResults = (queryData || []) as QueryResult[];
       setResults(queryResults);
 
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-results', {
