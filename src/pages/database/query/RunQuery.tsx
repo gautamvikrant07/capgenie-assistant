@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2, FileText } from "lucide-react";
+import { Database, Play, Download, Save, Terminal, CheckCircle, Loader2, FileText } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 type QueryResult = Record<string, any>;
+
+interface ExecuteQueryParams {
+  query_string: string;
+}
 
 const RunQuery = () => {
   const [query, setQuery] = useState("");
@@ -75,11 +79,13 @@ const RunQuery = () => {
     setLoading(true);
     try {
       const { data: queryData, error: queryError } = await supabase
-        .rpc('execute_query', { query_string: generatedSQL } as any);
+        .rpc<QueryResult[]>('execute_query', {
+          query_string: generatedSQL
+        } satisfies ExecuteQueryParams);
 
       if (queryError) throw queryError;
 
-      const queryResults = (queryData || []) as QueryResult[];
+      const queryResults = queryData || [];
       setResults(queryResults);
 
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-results', {
