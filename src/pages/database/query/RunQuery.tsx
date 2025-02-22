@@ -21,6 +21,10 @@ const RunQuery = () => {
     if (!file) return;
 
     try {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        throw new Error('File size too large. Maximum size is 10MB.');
+      }
+      
       setDbName(file.name);
       await loadDatabase(file);
     } catch (error: any) {
@@ -33,28 +37,26 @@ const RunQuery = () => {
   };
 
   const loadDatabase = async (file?: File) => {
-    if (!dbName && !file) {
+    if (!file) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please enter a database path or select a database file",
+        description: "Please select a database file",
       });
       return;
     }
 
     setDbLoading(true);
     try {
-      let fileContent;
-      if (file) {
-        const arrayBuffer = await file.arrayBuffer();
-        fileContent = Array.from(new Uint8Array(arrayBuffer));
-      }
+      // Convert file to array buffer
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const array = Array.from(uint8Array); // Convert to regular array for JSON
+
+      console.log('Sending file of size:', array.length);
 
       const { data, error } = await supabase.functions.invoke('connect-database', {
-        body: {
-          dbPath: dbName,
-          fileContent
-        }
+        body: { fileContent: array }
       });
 
       if (error) {
@@ -171,32 +173,8 @@ const RunQuery = () => {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <div className="glass-card rounded-xl p-6 mb-6">
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <input
-                  type="text"
-                  value={dbName}
-                  onChange={(e) => setDbName(e.target.value)}
-                  placeholder="Enter database path..."
-                  className="flex-1 px-4 py-2 rounded-lg border border-input bg-background 
-                           focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <button
-                  onClick={() => loadDatabase()}
-                  disabled={dbLoading}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  {dbLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Database className="w-4 h-4" />
-                  )}
-                  Load Database
-                </button>
-              </div>
-              
+            <div className="space-y-4">              
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Or browse local file:</span>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -206,11 +184,16 @@ const RunQuery = () => {
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="btn-secondary flex items-center gap-2"
+                  className="btn-primary flex items-center gap-2"
                 >
-                  <FolderOpen className="w-4 h-4" />
-                  Browse
+                  {dbLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FolderOpen className="w-4 h-4" />
+                  )}
+                  Select Database File
                 </button>
+                {dbName && <span className="text-sm text-muted-foreground">Selected: {dbName}</span>}
               </div>
             </div>
 

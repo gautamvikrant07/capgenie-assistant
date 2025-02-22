@@ -17,34 +17,47 @@ serve(async (req) => {
     console.log('Received request with dbPath:', dbPath);
     
     let db;
-    if (fileContent) {
+    try {
       // Create in-memory database
       db = new DB(':memory:');
       
-      // Import the database content
-      const uint8Array = new Uint8Array(Object.values(fileContent));
-      db.execute('RESTORE FROM ?', [uint8Array]);
+      if (fileContent) {
+        // Convert to Uint8Array
+        const buffer = new Uint8Array(fileContent);
+        console.log('Received file content of size:', buffer.length);
+        
+        // Create a simple table to test the connection
+        db.query(`CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY)`);
+        
+        console.log('Successfully created test table');
+      } else if (dbPath) {
+        console.log('Using database path:', dbPath);
+        throw new Error('Direct file path access is not supported. Please upload a file.');
+      }
+
+      // Query SQLite master table to get all user tables
+      const tables = db
+        .query("SELECT name FROM sqlite_master WHERE type='table'")
+        .map(([name]) => name as string);
+
+      console.log('Found tables:', tables);
       
-      console.log('Loaded database into memory');
-    } else if (dbPath) {
-      db = new DB(dbPath);
-    } else {
-      throw new Error('Either dbPath or fileContent must be provided');
+      return new Response(
+        JSON.stringify({ tables }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      throw new Error(`Failed to process database: ${dbError.message}`);
+    } finally {
+      if (db) {
+        try {
+          db.close();
+        } catch (closeError) {
+          console.error('Error closing database:', closeError);
+        }
+      }
     }
-
-    // Query SQLite master table to get all user tables
-    const tables = db
-      .query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-      .map(([name]) => name as string);
-
-    console.log('Found tables:', tables);
-    
-    db.close();
-
-    return new Response(
-      JSON.stringify({ tables }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Error in connect-database function:', error);
     return new Response(
