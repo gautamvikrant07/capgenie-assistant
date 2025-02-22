@@ -1,4 +1,5 @@
 
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -15,65 +16,66 @@ serve(async (req) => {
     const { query, tables } = await req.json();
     console.log('Received request:', { query, tables });
 
-    if (!query) {
-      throw new Error('Query is required');
-    }
-
-    if (!tables || !Array.isArray(tables) || tables.length === 0) {
-      throw new Error('Database tables information is required');
-    }
-
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OpenAI API key is not configured');
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIApiKey) {
+      throw new Error('OpenAI API key not configured');
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content: `You are an expert SQL developer specialized in SQLite. Generate precise SQL queries based on natural language inputs.
+            content: `You are a financial data analyst specializing in COREP reporting and SQL. Analyze the following tables and provide both SQL queries and detailed analysis:
             Available tables: ${tables.join(', ')}
-            Guidelines:
-            - Generate ONLY the SQL query, no explanations
-            - Ensure SQLite compatibility
-            - Use proper table names as provided
-            - Add appropriate JOINs when needed
-            - Include WHERE clauses for filtering
-            - Add ORDER BY for sorting when relevant
-            - Use proper aggregation functions when needed
-            - Implement subqueries if necessary
-            - Consider performance optimization`
+            
+            Table relationships:
+            - corep_exposures links to corep_institutions via institution_id
+            - corep_exposures links to corep_counterparties via counterparty_id
+            - corep_exposure_details links to corep_exposures via exposure_id
+            - corep_large_exposures links to corep_exposures via exposure_id`
           },
           {
             role: 'user',
-            content: query
+            content: `For the question: "${query}", please provide:
+            1. An SQL query to fetch the relevant data
+            2. A detailed analysis explaining what the data means in the context of COREP reporting`
           }
         ],
         temperature: 0.3,
-        max_tokens: 500,
       }),
     });
 
     const data = await response.json();
     console.log('OpenAI response:', data);
 
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    if (!data.choices?.[0]?.message?.content) {
       throw new Error('Invalid response from OpenAI');
     }
 
-    const generatedSQL = data.choices[0].message.content.trim();
-    console.log('Generated SQL:', generatedSQL);
+    const content = data.choices[0].message.content;
+    let sqlQuery = '';
+    let analysis = '';
+
+    // Extract SQL and analysis from the response
+    if (content.includes('SQL query')) {
+      const parts = content.split(/SQL query:?|Analysis:/i);
+      sqlQuery = parts[1]?.trim() || '';
+      analysis = parts[2]?.trim() || '';
+    } else {
+      // Fallback if the format is different
+      sqlQuery = content.match(/SELECT[\s\S]*?;/i)?.[0] || '';
+      analysis = content.replace(sqlQuery, '').trim();
+    }
 
     return new Response(
-      JSON.stringify({ sql: generatedSQL }),
+      JSON.stringify({ sql: sqlQuery, analysis }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

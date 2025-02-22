@@ -1,6 +1,7 @@
+
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2, FileText } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +11,7 @@ type QueryResult = Record<string, any>;
 const RunQuery = () => {
   const [query, setQuery] = useState("");
   const [generatedSQL, setGeneratedSQL] = useState("");
+  const [analysis, setAnalysis] = useState("");
   const [results, setResults] = useState<QueryResult[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -44,6 +46,7 @@ const RunQuery = () => {
       if (error) throw error;
 
       setGeneratedSQL(data?.sql || '');
+      setAnalysis(data?.analysis || '');
       toast({
         title: "Success",
         description: "SQL query generated successfully",
@@ -72,11 +75,9 @@ const RunQuery = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('execute_query')
-        .rpc('execute_query', {
-          query_string: generatedSQL
-        });
+      const { data, error } = await supabase.rpc('execute_query', {
+        query_string: generatedSQL
+      });
 
       if (error) throw error;
 
@@ -177,6 +178,24 @@ const RunQuery = () => {
               <pre className="bg-muted p-4 rounded-lg overflow-x-auto border border-input">
                 <code>{generatedSQL}</code>
               </pre>
+            </motion.div>
+          )}
+
+          {analysis && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass-card rounded-xl p-6 mb-6"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-5 h-5 text-blue-500" />
+                <h2 className="text-lg font-semibold">AI Analysis</h2>
+              </div>
+              <div className="prose prose-sm max-w-none">
+                {analysis.split('\n').map((line, i) => (
+                  <p key={i} className="mb-2">{line}</p>
+                ))}
+              </div>
             </motion.div>
           )}
 
