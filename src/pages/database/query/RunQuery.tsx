@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
@@ -73,15 +72,15 @@ const RunQuery = () => {
 
     setLoading(true);
     try {
-      // Using the proper type for query_string parameter
-      const { data, error } = await supabase.rpc('execute_query', {
-        query_string: generatedSQL
-      } as { query_string: string });
+      const { data, error } = await supabase
+        .from('execute_query')
+        .rpc('execute_query', {
+          query_string: generatedSQL
+        });
 
       if (error) throw error;
 
-      // Safely handle potentially null data
-      const queryResults = data as QueryResult[] || [];
+      const queryResults = (data || []) as QueryResult[];
       setResults(queryResults);
       
       toast({
