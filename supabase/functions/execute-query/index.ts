@@ -12,6 +12,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let db: DB | undefined;
+  const tempFilePath = "/tmp/temp.db";
+
   try {
     const { sql, fileContent } = await req.json();
     console.log('Executing SQL:', sql);
@@ -20,70 +23,52 @@ serve(async (req) => {
       throw new Error('SQL query is required');
     }
 
-    if (!fileContent) {
-      throw new Error('Database content is required');
+    if (!fileContent || !Array.isArray(fileContent)) {
+      throw new Error('Invalid file content');
     }
 
-    // Create in-memory database
-    const db = new DB(':memory:');
-    
+    // Write the file content to a temporary file
+    const uint8Array = new Uint8Array(fileContent);
+    await Deno.writeFile(tempFilePath, uint8Array);
+
+    // Open the database file
+    db = new DB(tempFilePath);
+    console.log('Successfully opened database');
+
+    // Execute the query
     try {
-      // Import the database content
-      const buffer = new Uint8Array(fileContent);
-      console.log('Database content size:', buffer.length);
-
-      // Execute the query
-      const stmt = db.prepare(sql);
       const results = [];
-      const columns = [];
-      let columnsFetched = false;
-
-      for (const row of stmt.iter()) {
-        if (!columnsFetched) {
-          columns.push(...stmt.columns());
-          columnsFetched = true;
-        }
-
-        // Convert row array to object with column names
-        const rowObj = Object.fromEntries(
-          columns.map((col, i) => [col, row[i]])
-        );
-
+      const query = db.prepare(sql);
+      
+      // Get column names
+      const columns = query.columns();
+      
+      // Fetch all rows
+      for (const row of query.iter()) {
+        const rowObj = {};
+        columns.forEach((col, index) => {
+          rowObj[col] = row[index];
+        });
         results.push(rowObj);
       }
 
       console.log(`Query executed successfully. Rows returned: ${results.length}`);
 
-      // Calculate statistics for numeric columns
-      const stats = {};
-      if (results.length > 0) {
-        columns.forEach(col => {
-          const values = results.map(row => row[col]).filter(val => typeof val === 'number');
-          if (values.length > 0) {
-            stats[col] = {
-              min: Math.min(...values),
-              max: Math.max(...values),
-              avg: values.reduce((a, b) => a + b, 0) / values.length,
-              count: values.length
-            };
-          }
-        });
-      }
-
       return new Response(
-        JSON.stringify({
+        JSON.stringify({ 
           results,
           metadata: {
-            rowCount: results.length,
             columns,
-            stats
+            rowCount: results.length
           }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    } finally {
-      db.close();
+
+    } catch (queryError) {
+      throw new Error(`SQL execution error: ${queryError.message}`);
     }
+
   } catch (error) {
     console.error('Error in execute-query function:', error);
     return new Response(
@@ -93,5 +78,19 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
+  } finally {
+    if (db) {
+      try {
+        db.close();
+      } catch (error) {
+        console.error('Error closing database:', error);
+      }
+    }
+    // Clean up temporary file
+    try {
+      await Deno.remove(tempFilePath);
+    } catch (error) {
+      console.error('Error removing temporary file:', error);
+    }
   }
 });
