@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2, FolderOpen } from "lucide-react";
@@ -20,8 +21,16 @@ const RunQuery = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setDbName(file.name);
-    await loadDatabase(file);
+    try {
+      setDbName(file.name);
+      await loadDatabase(file);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to load database file"
+      });
+    }
   };
 
   const loadDatabase = async (file?: File) => {
@@ -36,16 +45,16 @@ const RunQuery = () => {
 
     setDbLoading(true);
     try {
-      let formData = new FormData();
+      const formData = new FormData();
       if (file) {
         formData.append('file', file);
       } else {
         formData.append('dbPath', dbName);
       }
 
-      // Call the Supabase Edge Function to connect to the database
+      // Call the Supabase Edge Function
       const { data, error } = await supabase.functions.invoke('connect-database', {
-        body: { 
+        body: {
           dbPath: dbName,
           fileContent: file ? await file.arrayBuffer() : undefined
         }
@@ -59,6 +68,7 @@ const RunQuery = () => {
         description: "Database loaded successfully",
       });
     } catch (error: any) {
+      console.error('Database loading error:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -81,7 +91,6 @@ const RunQuery = () => {
 
     setLoading(true);
     try {
-      // Call the Supabase Edge Function to generate SQL
       const { data, error } = await supabase.functions.invoke('generate-sql', {
         body: { 
           query,
@@ -94,6 +103,7 @@ const RunQuery = () => {
 
       setGeneratedSQL(data.sql);
     } catch (error: any) {
+      console.error('SQL generation error:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -116,7 +126,6 @@ const RunQuery = () => {
 
     setLoading(true);
     try {
-      // Call the Supabase Edge Function to execute the query
       const { data, error } = await supabase.functions.invoke('execute-query', {
         body: { 
           sql: generatedSQL,
@@ -127,7 +136,12 @@ const RunQuery = () => {
       if (error) throw error;
 
       setResults(data.results);
+      toast({
+        title: "Success",
+        description: `Query executed successfully. ${data.results.length} rows returned.`,
+      });
     } catch (error: any) {
+      console.error('Query execution error:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -209,29 +223,40 @@ const RunQuery = () => {
               </div>
             )}
 
-            <label className="block text-sm font-medium mb-2">Query Input</label>
-            <textarea
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Enter your query in natural language..."
-              className="w-full h-32 p-3 rounded-lg border border-input bg-background resize-none focus:ring-2 focus:ring-primary focus:outline-none"
-            />
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={handleGenerateSQL}
-                className="btn-primary flex items-center gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-              >
-                <Database className="w-4 h-4" />
-                Generate SQL
-              </button>
-              <button
-                onClick={handleRunQuery}
-                disabled={!generatedSQL}
-                className="btn-secondary flex items-center gap-2"
-              >
-                <Play className="w-4 h-4" />
-                Run Query
-              </button>
+            <div className="mt-6">
+              <label className="block text-sm font-medium mb-2">Query Input</label>
+              <textarea
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Enter your query in natural language..."
+                className="w-full h-32 p-3 rounded-lg border border-input bg-background resize-none focus:ring-2 focus:ring-primary focus:outline-none"
+              />
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={handleGenerateSQL}
+                  disabled={loading || !dbName}
+                  className="btn-primary flex items-center gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Database className="w-4 h-4" />
+                  )}
+                  Generate SQL
+                </button>
+                <button
+                  onClick={handleRunQuery}
+                  disabled={loading || !generatedSQL}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  Run Query
+                </button>
+              </div>
             </div>
           </div>
 
@@ -239,7 +264,7 @@ const RunQuery = () => {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-card rounded-xl p-6 mb-6 border border-primary/10"
+              className="glass-card rounded-xl p-6 mb-6"
             >
               <div className="flex items-center gap-2 mb-4">
                 <CheckCircle className="w-5 h-5 text-green-500" />
@@ -255,7 +280,7 @@ const RunQuery = () => {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-card rounded-xl p-6 border border-accent/10"
+              className="glass-card rounded-xl p-6"
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
@@ -277,9 +302,9 @@ const RunQuery = () => {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-muted/50">
+                  <thead>
                     <tr>
-                      {Object.keys(results[0]).map((key) => (
+                      {Object.keys(results[0] || {}).map((key) => (
                         <th key={key} className="text-left p-3 font-medium">{key}</th>
                       ))}
                     </tr>
@@ -304,25 +329,36 @@ const RunQuery = () => {
         <div className="lg:col-span-1">
           <div className="glass-card rounded-xl p-6 sticky top-[80px]">
             <h2 className="text-lg font-semibold mb-4">Trend Analysis</h2>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={results}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#0088CC" 
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {results.length > 0 ? (
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={results}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey={Object.keys(results[0])[0]} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    {Object.keys(results[0])
+                      .filter(key => typeof results[0][key] === 'number')
+                      .map((key, index) => (
+                        <Line
+                          key={key}
+                          type="monotone"
+                          dataKey={key}
+                          stroke={index === 0 ? "#0088CC" : "#22C55E"}
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground">
+                Run a query to see trends in your data
+              </div>
+            )}
           </div>
         </div>
       </div>
