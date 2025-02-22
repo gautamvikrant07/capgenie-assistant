@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2, FolderOpen } from "lucide-react";
@@ -45,22 +44,26 @@ const RunQuery = () => {
 
     setDbLoading(true);
     try {
-      const formData = new FormData();
+      let fileContent;
       if (file) {
-        formData.append('file', file);
-      } else {
-        formData.append('dbPath', dbName);
+        const arrayBuffer = await file.arrayBuffer();
+        fileContent = Array.from(new Uint8Array(arrayBuffer));
       }
 
-      // Call the Supabase Edge Function
       const { data, error } = await supabase.functions.invoke('connect-database', {
         body: {
           dbPath: dbName,
-          fileContent: file ? await file.arrayBuffer() : undefined
+          fileContent
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data?.tables) {
+        throw new Error('No tables received from database');
+      }
 
       setDbTables(data.tables);
       toast({
@@ -74,6 +77,7 @@ const RunQuery = () => {
         title: "Error",
         description: error.message || "Failed to load database",
       });
+      setDbTables([]);
     } finally {
       setDbLoading(false);
     }

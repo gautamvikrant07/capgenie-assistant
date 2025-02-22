@@ -1,6 +1,6 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { DB } from "https://deno.land/x/sqlite@v3.8/mod.ts";
-import { Buffer } from "https://deno.land/std@0.168.0/node/buffer.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,17 +14,24 @@ serve(async (req) => {
 
   try {
     const { dbPath, fileContent } = await req.json();
+    console.log('Received request with dbPath:', dbPath);
     
     let db;
     if (fileContent) {
-      // If file content is provided, write it to a temporary file
-      const buf = Buffer.from(fileContent);
+      // Convert fileContent to Uint8Array
+      const uint8Array = new Uint8Array(Object.values(fileContent));
+      
+      // Create a temporary file
       const tempFile = await Deno.makeTempFile({ suffix: '.db' });
-      await Deno.writeFile(tempFile, buf);
+      await Deno.writeFile(tempFile, uint8Array);
+      console.log('Created temp file:', tempFile);
+      
+      // Open the database
       db = new DB(tempFile);
-    } else {
-      // Otherwise try to open the file from the provided path
+    } else if (dbPath) {
       db = new DB(dbPath);
+    } else {
+      throw new Error('Either dbPath or fileContent must be provided');
     }
 
     // Query SQLite master table to get all user tables
@@ -32,6 +39,8 @@ serve(async (req) => {
       .query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
       .map(([name]) => name as string);
 
+    console.log('Found tables:', tables);
+    
     db.close();
 
     return new Response(
@@ -39,9 +48,13 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
+    console.error('Error in connect-database function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
