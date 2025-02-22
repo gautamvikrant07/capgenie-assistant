@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { DB } from "https://deno.land/x/sqlite@v3.8/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,18 +13,20 @@ serve(async (req) => {
   }
 
   try {
-    const { sql, dbName } = await req.json();
+    const { sql, dbPath } = await req.json();
     
-    // This is where you would implement the actual query execution logic
-    // For now, we'll return mock data
-    const mockResults = [
-      { id: 1, name: 'Product A', price: 99.99, category: 'Electronics' },
-      { id: 2, name: 'Product B', price: 149.99, category: 'Electronics' },
-      { id: 3, name: 'Product C', price: 199.99, category: 'Electronics' },
-    ];
+    const db = new DB(dbPath);
+    const results = db.query(sql).map(row => {
+      // Convert array to object using column names
+      const columns = db.columns();
+      return Object.fromEntries(
+        columns.map((col, i) => [col, row[i]])
+      );
+    });
+    db.close();
 
     return new Response(
-      JSON.stringify({ results: mockResults }),
+      JSON.stringify({ results }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

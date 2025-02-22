@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { DB } from "https://deno.land/x/sqlite@v3.8/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,12 +13,33 @@ serve(async (req) => {
   }
 
   try {
-    const { query, dbName, tables } = await req.json();
+    const { query, dbPath, tables } = await req.json();
     
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
       throw new Error('Missing OpenAI API key');
     }
+
+    // Get table schemas
+    const db = new DB(dbPath);
+    const schemas = tables.map(table => {
+      const columns = db
+        .query(`PRAGMA table_info(${table})`)
+        .map(row => ({
+          name: row[1],
+          type: row[2],
+        }));
+      return { table, columns };
+    });
+    db.close();
+
+    const schemaDescription = schemas
+      .map(schema => 
+        `Table ${schema.table} columns: ${schema.columns.map(col => 
+          `${col.name} (${col.type})`
+        ).join(', ')}`
+      )
+      .join('\n');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -27,21 +48,24 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages: [
           {
             role: 'system',
-            content: `You are a SQL expert. Generate SQL queries based on natural language inputs. 
-                     Available tables: ${tables.join(', ')}. 
-                     Database: ${dbName}`
+            content: `You are a SQL expert. Generate SQLite-compatible SQL queries based on natural language inputs. 
+                     Available tables and their schemas:\n${schemaDescription}`
           },
-          { role: 'user', content: query }
+          { 
+            role: 'user', 
+            content: `Generate a SQL query for: ${query}\nOnly return the SQL query, nothing else.` 
+          }
         ],
+        temperature: 0.7,
       }),
     });
 
     const data = await response.json();
-    const sql = data.choices[0].message.content;
+    const sql = data.choices[0].message.content.trim();
 
     return new Response(
       JSON.stringify({ sql }),

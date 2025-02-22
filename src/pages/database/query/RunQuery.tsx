@@ -1,7 +1,6 @@
-
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2, FolderOpen } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,23 +13,42 @@ const RunQuery = () => {
   const [loading, setLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbTables, setDbTables] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const loadDatabase = async () => {
-    if (!dbName) {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setDbName(file.name);
+    await loadDatabase(file);
+  };
+
+  const loadDatabase = async (file?: File) => {
+    if (!dbName && !file) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please enter a database name",
+        description: "Please enter a database path or select a database file",
       });
       return;
     }
 
     setDbLoading(true);
     try {
+      let formData = new FormData();
+      if (file) {
+        formData.append('file', file);
+      } else {
+        formData.append('dbPath', dbName);
+      }
+
       // Call the Supabase Edge Function to connect to the database
       const { data, error } = await supabase.functions.invoke('connect-database', {
-        body: { dbName }
+        body: { 
+          dbPath: dbName,
+          fileContent: file ? await file.arrayBuffer() : undefined
+        }
       });
 
       if (error) throw error;
@@ -67,7 +85,7 @@ const RunQuery = () => {
       const { data, error } = await supabase.functions.invoke('generate-sql', {
         body: { 
           query,
-          dbName,
+          dbPath: dbName,
           tables: dbTables
         }
       });
@@ -102,7 +120,7 @@ const RunQuery = () => {
       const { data, error } = await supabase.functions.invoke('execute-query', {
         body: { 
           sql: generatedSQL,
-          dbName
+          dbPath: dbName
         }
       });
 
@@ -135,31 +153,51 @@ const RunQuery = () => {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <div className="glass-card rounded-xl p-6 mb-6">
-            <div className="flex gap-4 mb-6">
-              <input
-                type="text"
-                value={dbName}
-                onChange={(e) => setDbName(e.target.value)}
-                placeholder="Enter database name..."
-                className="flex-1 px-4 py-2 rounded-lg border border-input bg-background 
-                         focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <button
-                onClick={loadDatabase}
-                disabled={dbLoading}
-                className="btn-primary flex items-center gap-2"
-              >
-                {dbLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Database className="w-4 h-4" />
-                )}
-                Load Database
-              </button>
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  value={dbName}
+                  onChange={(e) => setDbName(e.target.value)}
+                  placeholder="Enter database path..."
+                  className="flex-1 px-4 py-2 rounded-lg border border-input bg-background 
+                           focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <button
+                  onClick={() => loadDatabase()}
+                  disabled={dbLoading}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  {dbLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Database className="w-4 h-4" />
+                  )}
+                  Load Database
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Or browse local file:</span>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept=".db,.sqlite,.sqlite3"
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  Browse
+                </button>
+              </div>
             </div>
 
             {dbTables.length > 0 && (
-              <div className="mb-6">
+              <div className="mt-6">
                 <h3 className="text-sm font-medium mb-2">Available Tables</h3>
                 <div className="flex flex-wrap gap-2">
                   {dbTables.map((table) => (
