@@ -13,6 +13,7 @@ const RunQuery = () => {
   const [loading, setLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbTables, setDbTables] = useState<string[]>([]);
+  const [dbContent, setDbContent] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -52,6 +53,7 @@ const RunQuery = () => {
       const arrayBuffer = await file.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       const array = Array.from(uint8Array); // Convert to regular array for JSON
+      setDbContent(array);
 
       console.log('Sending file of size:', array.length);
 
@@ -80,6 +82,7 @@ const RunQuery = () => {
         description: error.message || "Failed to load database",
       });
       setDbTables([]);
+      setDbContent([]);
     } finally {
       setDbLoading(false);
     }
@@ -100,7 +103,6 @@ const RunQuery = () => {
       const { data, error } = await supabase.functions.invoke('generate-sql', {
         body: { 
           query,
-          dbPath: dbName,
           tables: dbTables
         }
       });
@@ -130,12 +132,21 @@ const RunQuery = () => {
       return;
     }
 
+    if (!dbContent.length) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please load a database file first",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('execute-query', {
         body: { 
           sql: generatedSQL,
-          dbPath: dbName
+          fileContent: dbContent
         }
       });
 
