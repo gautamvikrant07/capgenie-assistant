@@ -1,94 +1,25 @@
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2, FolderOpen } from "lucide-react";
+import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-interface DatabaseState {
-  content: number[];
-  name: string;
-  tables: string[];
-}
 
 const RunQuery = () => {
   const [query, setQuery] = useState("");
   const [generatedSQL, setGeneratedSQL] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dbLoading, setDbLoading] = useState(false);
-  const [database, setDatabase] = useState<DatabaseState>({
-    content: [],
-    name: "",
-    tables: []
-  });
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        throw new Error('File size too large. Maximum size is 10MB.');
-      }
-      
-      await loadDatabase(file);
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to load database file"
-      });
-    }
-  };
-
-  const loadDatabase = async (file: File) => {
-    setDbLoading(true);
-    try {
-      // Convert file to array buffer
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const array = Array.from(uint8Array); // Convert to regular array for JSON
-
-      console.log('Sending file of size:', array.length);
-
-      const { data, error } = await supabase.functions.invoke('connect-database', {
-        body: { fileContent: array }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (!data?.tables) {
-        throw new Error('No tables received from database');
-      }
-
-      setDatabase({
-        content: array,
-        name: file.name,
-        tables: data.tables
-      });
-
-      toast({
-        title: "Success",
-        description: "Database loaded successfully",
-      });
-    } catch (error: any) {
-      console.error('Database loading error:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to load database",
-      });
-      setDatabase({ content: [], name: "", tables: [] });
-    } finally {
-      setDbLoading(false);
-    }
-  };
+  const tables = [
+    'corep_institutions',
+    'corep_counterparties',
+    'corep_exposures',
+    'corep_exposure_details',
+    'corep_large_exposures'
+  ];
 
   const handleGenerateSQL = async () => {
     if (!query) {
@@ -100,21 +31,12 @@ const RunQuery = () => {
       return;
     }
 
-    if (!database.tables.length) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please load a database file first",
-      });
-      return;
-    }
-
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-sql', {
         body: { 
           query,
-          tables: database.tables
+          tables
         }
       });
 
@@ -147,30 +69,18 @@ const RunQuery = () => {
       return;
     }
 
-    if (!database.content.length) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please load a database file first",
-      });
-      return;
-    }
-
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('execute-query', {
-        body: { 
-          sql: generatedSQL,
-          fileContent: database.content
-        }
+      const { data, error } = await supabase.rpc('execute_query', {
+        query_string: generatedSQL
       });
 
       if (error) throw error;
 
-      setResults(data.results);
+      setResults(data || []);
       toast({
         title: "Success",
-        description: `Query executed successfully. ${data.results.length} rows returned.`,
+        description: `Query executed successfully. ${data?.length || 0} rows returned.`,
       });
     } catch (error: any) {
       console.error('Query execution error:', error);
@@ -192,7 +102,7 @@ const RunQuery = () => {
         </div>
         <div>
           <h1 className="heading-lg mb-1">Run Query</h1>
-          <p className="text-muted-foreground">Execute natural language queries on your data</p>
+          <p className="text-muted-foreground">Execute natural language queries on COREP Large Exposure data</p>
         </div>
       </div>
 
@@ -200,58 +110,30 @@ const RunQuery = () => {
         <div className="lg:col-span-2">
           <div className="glass-card rounded-xl p-6 mb-6">
             <div className="space-y-4">              
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  accept=".db,.sqlite,.sqlite3"
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  {dbLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <FolderOpen className="w-4 h-4" />
-                  )}
-                  Select Database File
-                </button>
-                {database.name && (
-                  <span className="text-sm text-muted-foreground">
-                    Selected: {database.name}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {database.tables.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-sm font-medium mb-2">Available Tables</h3>
                 <div className="flex flex-wrap gap-2">
-                  {database.tables.map((table) => (
+                  {tables.map((table) => (
                     <span key={table} className="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full">
                       {table}
                     </span>
                   ))}
                 </div>
               </div>
-            )}
+            </div>
 
             <div className="mt-6">
               <label className="block text-sm font-medium mb-2">Query Input</label>
               <textarea
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Enter your query in natural language..."
+                placeholder="Enter your query in natural language... (e.g., 'Show me all large exposures that exceed limits')"
                 className="w-full h-32 p-3 rounded-lg border border-input bg-background resize-none focus:ring-2 focus:ring-primary focus:outline-none"
               />
               <div className="flex gap-3 mt-4">
                 <button
                   onClick={handleGenerateSQL}
-                  disabled={loading || !database.name}
+                  disabled={loading}
                   className="btn-primary flex items-center gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90"
                 >
                   {loading ? (

@@ -9,6 +9,175 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      corep_counterparties: {
+        Row: {
+          counterparty_id: number
+          counterparty_name: string
+          country: string | null
+          lei_code: string | null
+          sector: string | null
+        }
+        Insert: {
+          counterparty_id?: number
+          counterparty_name: string
+          country?: string | null
+          lei_code?: string | null
+          sector?: string | null
+        }
+        Update: {
+          counterparty_id?: number
+          counterparty_name?: string
+          country?: string | null
+          lei_code?: string | null
+          sector?: string | null
+        }
+        Relationships: []
+      }
+      corep_exposure_details: {
+        Row: {
+          collateral_value: number | null
+          crm_technique: string | null
+          exposure_detail_id: number
+          exposure_id: number
+          exposure_value: number | null
+          product_type: string | null
+          risk_weight: number | null
+        }
+        Insert: {
+          collateral_value?: number | null
+          crm_technique?: string | null
+          exposure_detail_id?: number
+          exposure_id: number
+          exposure_value?: number | null
+          product_type?: string | null
+          risk_weight?: number | null
+        }
+        Update: {
+          collateral_value?: number | null
+          crm_technique?: string | null
+          exposure_detail_id?: number
+          exposure_id?: number
+          exposure_value?: number | null
+          product_type?: string | null
+          risk_weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corep_exposure_details_exposure_id_fkey"
+            columns: ["exposure_id"]
+            isOneToOne: false
+            referencedRelation: "corep_exposures"
+            referencedColumns: ["exposure_id"]
+          },
+        ]
+      }
+      corep_exposures: {
+        Row: {
+          counterparty_id: number
+          exposure_amount: number
+          exposure_currency: string
+          exposure_date: string
+          exposure_id: number
+          exposure_type: string | null
+          institution_id: number
+          risk_mitigation: string | null
+        }
+        Insert: {
+          counterparty_id: number
+          exposure_amount: number
+          exposure_currency: string
+          exposure_date: string
+          exposure_id?: number
+          exposure_type?: string | null
+          institution_id: number
+          risk_mitigation?: string | null
+        }
+        Update: {
+          counterparty_id?: number
+          exposure_amount?: number
+          exposure_currency?: string
+          exposure_date?: string
+          exposure_id?: number
+          exposure_type?: string | null
+          institution_id?: number
+          risk_mitigation?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corep_exposures_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "corep_counterparties"
+            referencedColumns: ["counterparty_id"]
+          },
+          {
+            foreignKeyName: "corep_exposures_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "corep_institutions"
+            referencedColumns: ["institution_id"]
+          },
+        ]
+      }
+      corep_institutions: {
+        Row: {
+          country: string | null
+          institution_id: number
+          institution_name: string
+          lei_code: string | null
+          reporting_currency: string
+          reporting_date: string
+        }
+        Insert: {
+          country?: string | null
+          institution_id?: number
+          institution_name: string
+          lei_code?: string | null
+          reporting_currency: string
+          reporting_date: string
+        }
+        Update: {
+          country?: string | null
+          institution_id?: number
+          institution_name?: string
+          lei_code?: string | null
+          reporting_currency?: string
+          reporting_date?: string
+        }
+        Relationships: []
+      }
+      corep_large_exposures: {
+        Row: {
+          comments: string | null
+          exposure_id: number
+          large_exposure_id: number
+          limit_breach_flag: boolean | null
+          limit_reference: string | null
+        }
+        Insert: {
+          comments?: string | null
+          exposure_id: number
+          large_exposure_id?: number
+          limit_breach_flag?: boolean | null
+          limit_reference?: string | null
+        }
+        Update: {
+          comments?: string | null
+          exposure_id?: number
+          large_exposure_id?: number
+          limit_breach_flag?: boolean | null
+          limit_reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corep_large_exposures_exposure_id_fkey"
+            columns: ["exposure_id"]
+            isOneToOne: false
+            referencedRelation: "corep_exposures"
+            referencedColumns: ["exposure_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
