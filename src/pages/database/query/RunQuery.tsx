@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Database, Play, Download, Save, Terminal, AlertCircle, CheckCircle, Loader2, FileText } from "lucide-react";
@@ -46,7 +45,7 @@ const RunQuery = () => {
       if (error) throw error;
 
       setGeneratedSQL(data?.sql || '');
-      setAnalysis(data?.analysis || '');
+      setAnalysis('');
       toast({
         title: "Success",
         description: "SQL query generated successfully",
@@ -75,14 +74,24 @@ const RunQuery = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('execute_query', {
-        query_string: generatedSQL
+      const { data: queryData, error: queryError } = await supabase
+        .rpc('execute_query', { query_string: generatedSQL } as any);
+
+      if (queryError) throw queryError;
+
+      const queryResults = (queryData || []) as QueryResult[];
+      setResults(queryResults);
+
+      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-results', {
+        body: { 
+          query,
+          results: queryResults
+        }
       });
 
-      if (error) throw error;
+      if (analysisError) throw analysisError;
 
-      const queryResults = (data || []) as QueryResult[];
-      setResults(queryResults);
+      setAnalysis(analysisData?.analysis || '');
       
       toast({
         title: "Success",

@@ -13,8 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const { query, tables } = await req.json();
-    console.log('Received request:', { query, tables });
+    const { query, results } = await req.json();
+    console.log('Received request:', { query, resultsCount: results.length });
 
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
@@ -32,20 +32,18 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a SQL expert specialized in COREP reporting. Generate SQL queries for the following tables:
-            Available tables: ${tables.join(', ')}
+            content: `You are a financial data analyst specializing in COREP reporting. 
+            Analyze the query results and provide insights about:
+            - Key findings and patterns
+            - Regulatory implications
+            - Potential risks or areas of concern
+            - Recommendations if applicable
             
-            Table relationships:
-            - corep_exposures links to corep_institutions via institution_id
-            - corep_exposures links to corep_counterparties via counterparty_id
-            - corep_exposure_details links to corep_exposures via exposure_id
-            - corep_large_exposures links to corep_exposures via exposure_id
-            
-            Return ONLY the SQL query without any explanation.`
+            Be concise but thorough in your analysis.`
           },
           {
             role: 'user',
-            content: query
+            content: `For the query: "${query}", analyze these results: ${JSON.stringify(results, null, 2)}`
           }
         ],
         temperature: 0.3,
@@ -59,15 +57,12 @@ serve(async (req) => {
       throw new Error('Invalid response from OpenAI');
     }
 
-    // Clean up the response to only include the SQL query
-    const sqlQuery = data.choices[0].message.content.replace(/```sql|```/g, '').trim();
-
     return new Response(
-      JSON.stringify({ sql: sqlQuery }),
+      JSON.stringify({ analysis: data.choices[0].message.content }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error in generate-sql function:', error);
+    console.error('Error in analyze-results function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
