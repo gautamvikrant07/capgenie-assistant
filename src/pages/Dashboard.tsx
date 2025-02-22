@@ -36,14 +36,26 @@ const Dashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('*, user_roles(*)')
+          .select(`
+            *,
+            user_roles (
+              id,
+              role,
+              created_at
+            )
+          `)
           .eq('id', user.id)
           .single();
+
+        if (error) {
+          console.error('Error fetching profile:', error);
+          return;
+        }
         
-        if (profile) {
-          setProfile(profile);
+        if (profileData) {
+          setProfile(profileData as Profile);
         }
       }
     } catch (error) {
