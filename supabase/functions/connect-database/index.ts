@@ -12,61 +12,76 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  let db: DB | undefined;
-  const tempFilePath = "/tmp/temp.db";
+  const dbPath = '/tmp/temp.db';
+  let db: DB | null = null;
 
   try {
     const { fileContent } = await req.json();
-    console.log('Received file content of size:', fileContent.length);
-
+    
     if (!fileContent || !Array.isArray(fileContent)) {
       throw new Error('Invalid file content');
     }
 
-    // Write the file content to a temporary file
-    const uint8Array = new Uint8Array(fileContent);
-    await Deno.writeFile(tempFilePath, uint8Array);
+    // Write the database file
+    try {
+      await Deno.writeFile(dbPath, new Uint8Array(fileContent));
+    } catch (error) {
+      console.error('Error writing file:', error);
+      throw new Error('Failed to write database file');
+    }
 
-    // Open the database file
-    db = new DB(tempFilePath);
-    console.log('Successfully opened database');
+    // Open the database
+    try {
+      db = new DB(dbPath);
+      console.log('Database opened successfully');
+    } catch (error) {
+      console.error('Error opening database:', error);
+      throw new Error('Failed to open database file');
+    }
 
-    // Query SQLite master table to get all user tables
-    const tables = db
-      .query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-      .map(([name]) => name as string);
+    // Get all user tables
+    const tables = db.query(`
+      SELECT name 
+      FROM sqlite_master 
+      WHERE type='table' 
+      AND name NOT LIKE 'sqlite_%'
+      ORDER BY name
+    `).map(([name]) => name as string);
 
     console.log('Found tables:', tables);
 
     if (tables.length === 0) {
-      throw new Error('No tables found in the database');
+      throw new Error('No tables found in database');
     }
 
     // Get schema for each table
     const schema = {};
     for (const table of tables) {
-      const tableInfo = db.query(`PRAGMA table_info(${table})`).map(row => ({
-        name: row[1],
-        type: row[2]
-      }));
-      schema[table] = tableInfo;
+      try {
+        const tableInfo = db.query(`PRAGMA table_info("${table}")`);
+        schema[table] = tableInfo.map(row => ({
+          name: row[1],
+          type: row[2],
+          notnull: row[3],
+          pk: row[5]
+        }));
+      } catch (error) {
+        console.error(`Error getting schema for table ${table}:`, error);
+      }
     }
-    
+
     return new Response(
-      JSON.stringify({ 
-        tables,
-        schema
-      }),
+      JSON.stringify({ tables, schema }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error in connect-database function:', error);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   } finally {
@@ -77,11 +92,10 @@ serve(async (req) => {
         console.error('Error closing database:', error);
       }
     }
-    // Clean up temporary file
     try {
-      await Deno.remove(tempFilePath);
+      await Deno.remove(dbPath);
     } catch (error) {
-      console.error('Error removing temporary file:', error);
+      console.error('Error removing temp file:', error);
     }
   }
 });

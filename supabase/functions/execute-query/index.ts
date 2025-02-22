@@ -12,13 +12,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  let db: DB | undefined;
-  const tempFilePath = "/tmp/temp.db";
+  const dbPath = '/tmp/temp.db';
+  let db: DB | null = null;
 
   try {
     const { sql, fileContent } = await req.json();
-    console.log('Executing SQL:', sql);
-
+    
     if (!sql) {
       throw new Error('SQL query is required');
     }
@@ -27,29 +26,35 @@ serve(async (req) => {
       throw new Error('Invalid file content');
     }
 
-    // Write the file content to a temporary file
-    const uint8Array = new Uint8Array(fileContent);
-    await Deno.writeFile(tempFilePath, uint8Array);
+    // Write the database file
+    try {
+      await Deno.writeFile(dbPath, new Uint8Array(fileContent));
+    } catch (error) {
+      console.error('Error writing file:', error);
+      throw new Error('Failed to write database file');
+    }
 
-    // Open the database file
-    db = new DB(tempFilePath);
-    console.log('Successfully opened database');
+    // Open the database
+    try {
+      db = new DB(dbPath);
+      console.log('Database opened successfully');
+    } catch (error) {
+      console.error('Error opening database:', error);
+      throw new Error('Failed to open database file');
+    }
 
     // Execute the query
     try {
+      const stmt = db.prepare(sql);
       const results = [];
-      const query = db.prepare(sql);
-      
-      // Get column names
-      const columns = query.columns();
-      
-      // Fetch all rows
-      for (const row of query.iter()) {
-        const rowObj = {};
+      const columns = stmt.columns().map(col => col.toString());
+
+      for (const row of stmt.iter()) {
+        const obj = {};
         columns.forEach((col, index) => {
-          rowObj[col] = row[index];
+          obj[col] = row[index];
         });
-        results.push(rowObj);
+        results.push(obj);
       }
 
       console.log(`Query executed successfully. Rows returned: ${results.length}`);
@@ -58,24 +63,25 @@ serve(async (req) => {
         JSON.stringify({ 
           results,
           metadata: {
-            columns,
-            rowCount: results.length
+            rowCount: results.length,
+            columns
           }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
-    } catch (queryError) {
-      throw new Error(`SQL execution error: ${queryError.message}`);
+    } catch (error) {
+      console.error('Query execution error:', error);
+      throw new Error(`Failed to execute query: ${error.message}`);
     }
 
   } catch (error) {
-    console.error('Error in execute-query function:', error);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   } finally {
@@ -86,11 +92,10 @@ serve(async (req) => {
         console.error('Error closing database:', error);
       }
     }
-    // Clean up temporary file
     try {
-      await Deno.remove(tempFilePath);
+      await Deno.remove(dbPath);
     } catch (error) {
-      console.error('Error removing temporary file:', error);
+      console.error('Error removing temp file:', error);
     }
   }
 });
