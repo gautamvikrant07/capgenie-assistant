@@ -6,10 +6,12 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+type QueryResult = Record<string, any>;
+
 const RunQuery = () => {
   const [query, setQuery] = useState("");
   const [generatedSQL, setGeneratedSQL] = useState("");
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<QueryResult[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -42,7 +44,7 @@ const RunQuery = () => {
 
       if (error) throw error;
 
-      setGeneratedSQL(data.sql);
+      setGeneratedSQL(data?.sql || '');
       toast({
         title: "Success",
         description: "SQL query generated successfully",
@@ -71,16 +73,20 @@ const RunQuery = () => {
 
     setLoading(true);
     try {
+      // Using the proper type for query_string parameter
       const { data, error } = await supabase.rpc('execute_query', {
         query_string: generatedSQL
-      });
+      } as { query_string: string });
 
       if (error) throw error;
 
-      setResults(data || []);
+      // Safely handle potentially null data
+      const queryResults = data as QueryResult[] || [];
+      setResults(queryResults);
+      
       toast({
         title: "Success",
-        description: `Query executed successfully. ${data?.length || 0} rows returned.`,
+        description: `Query executed successfully. ${queryResults.length} rows returned.`,
       });
     } catch (error: any) {
       console.error('Query execution error:', error);
@@ -203,7 +209,7 @@ const RunQuery = () => {
                 <table className="w-full">
                   <thead>
                     <tr>
-                      {Object.keys(results[0] || {}).map((key) => (
+                      {results.length > 0 && Object.keys(results[0]).map((key) => (
                         <th key={key} className="text-left p-3 font-medium">{key}</th>
                       ))}
                     </tr>
