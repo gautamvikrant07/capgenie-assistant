@@ -29,5 +29,14 @@ export type Database = {
         Update: Partial<Omit<UserRole, 'id' | 'user_id'>>;
       };
     };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
   };
 };

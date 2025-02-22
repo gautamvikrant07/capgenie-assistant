@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { DB } from "https://deno.land/x/sqlite@v3.8/mod.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,6 +42,8 @@ serve(async (req) => {
       )
       .join('\n');
 
+    console.log('Generating SQL with schema:', schemaDescription);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -48,33 +51,58 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: `You are a SQL expert. Generate SQLite-compatible SQL queries based on natural language inputs. 
-                     Available tables and their schemas:\n${schemaDescription}`
+            content: `You are an expert SQL developer specialized in SQLite. Your task is to generate precise SQL queries based on natural language inputs.
+            
+            Database Schema:
+            ${schemaDescription}
+            
+            Guidelines:
+            - Generate ONLY the SQL query, no explanations
+            - Ensure SQLite compatibility
+            - Use proper table and column names as provided
+            - Add appropriate JOINs when needed
+            - Include WHERE clauses for filtering
+            - Add ORDER BY for sorting when relevant
+            - Use proper aggregation functions when needed
+            - Implement subqueries if necessary
+            - Consider performance optimization`
           },
           { 
-            role: 'user', 
-            content: `Generate a SQL query for: ${query}\nOnly return the SQL query, nothing else.` 
+            role: 'user',
+            content: query
           }
         ],
-        temperature: 0.7,
+        temperature: 0.3, // Lower temperature for more precise output
+        max_tokens: 500,
       }),
     });
 
     const data = await response.json();
-    const sql = data.choices[0].message.content.trim();
+    const generatedSQL = data.choices[0].message.content.trim();
+
+    // Validate the generated SQL by attempting to prepare it
+    try {
+      const db = new DB(dbPath);
+      db.prepare(generatedSQL);
+      db.close();
+    } catch (error) {
+      console.error('SQL validation failed:', error);
+      throw new Error(`Generated SQL is invalid: ${error.message}`);
+    }
 
     return new Response(
-      JSON.stringify({ sql }),
+      JSON.stringify({ sql: generatedSQL }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
+    console.error('Error in generate-sql function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

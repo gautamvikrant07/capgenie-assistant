@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ArrowUpRight, Users, Database, FileCheck } from "lucide-react";
-import type { Profile } from "@/types/supabase";
+import type { Profile, UserRole } from "@/types/supabase";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -36,10 +36,14 @@ const Dashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        const { data: profileData, error } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select(`
-            *,
+            id,
+            first_name,
+            last_name,
+            created_at,
+            updated_at,
             user_roles (
               id,
               role,
@@ -54,8 +58,17 @@ const Dashboard = () => {
           return;
         }
         
-        if (profileData) {
-          setProfile(profileData as Profile);
+        if (data) {
+          // Ensure the data matches the Profile type
+          const profileData: Profile = {
+            id: data.id,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            user_roles: data.user_roles as UserRole[]
+          };
+          setProfile(profileData);
         }
       }
     } catch (error) {
