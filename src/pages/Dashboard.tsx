@@ -5,13 +5,14 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ArrowUpRight, Users, Database, FileCheck } from "lucide-react";
-import type { Profile, UserRole } from "@/types/supabase";
+import type { ProfileWithRoles } from "@/types/supabase";
+import { useToast } from "@/components/ui/use-toast";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [profileData, setProfileData] = useState<ProfileWithRoles | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   const chartData = [
     { name: 'Jan', queries: 65, validations: 28 },
@@ -36,37 +37,45 @@ const Dashboard = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      if (user) {
-        // Fetch profile data
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+      if (!user) {
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: "Please sign in to access the dashboard."
+        });
+        navigate('/login');
+        return;
+      }
 
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          return;
-        }
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_roles (*)
+        `)
+        .eq('id', user.id)
+        .maybeSingle();
 
-        if (profileData) {
-          setProfile(profileData);
-          
-          // Fetch user roles separately
-          const { data: roleData, error: roleError } = await supabase
-            .from('user_roles')
-            .select('*')
-            .eq('user_id', user.id);
+      if (error) {
+        console.error('Error fetching profile:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load profile data."
+        });
+        return;
+      }
 
-          if (roleError) {
-            console.error('Error fetching user roles:', roleError);
-          } else if (roleData) {
-            setUserRoles(roleData);
-          }
-        }
+      if (data) {
+        setProfileData(data as ProfileWithRoles);
       }
     } catch (error) {
       console.error('Error loading user data:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred."
+      });
     } finally {
       setLoading(false);
     }
@@ -79,7 +88,7 @@ const Dashboard = () => {
   return (
     <div className="container py-8">
       <div className="mb-8">
-        <h1 className="heading-lg mb-2">Welcome back, {profile?.first_name || 'User'}!</h1>
+        <h1 className="heading-lg mb-2">Welcome back, {profileData?.first_name || 'User'}!</h1>
         <p className="text-muted-foreground">Here's what's happening with your regulatory data.</p>
       </div>
 

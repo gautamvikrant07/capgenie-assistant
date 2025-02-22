@@ -14,6 +14,10 @@ export type UserRole = {
   created_at: string;
 };
 
+export type ProfileWithRoles = Profile & {
+  user_roles: UserRole[];
+};
+
 export type Database = {
   public: {
     Tables: {
